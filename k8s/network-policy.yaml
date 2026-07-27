@@ -1,0 +1,55 @@
+# Default-deny, then explicitly allow only what's needed. This is the
+# single highest-leverage K8s security control most teams skip.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: promptshield-default-deny
+spec:
+  podSelector:
+    matchLabels:
+      app: promptshield
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: promptshield-allow-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: promptshield
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: promptshield-allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app: promptshield
+  policyTypes:
+    - Egress
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+    # HTTPS out to the upstream LLM provider only — tighten this to a
+    # specific egress gateway / IP range in a real cluster.
+    - ports:
+        - protocol: TCP
+          port: 443

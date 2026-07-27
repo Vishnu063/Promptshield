@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: promptshield
+  labels:
+    app: promptshield
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: promptshield
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: promptshield
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: promptshield
+          image: promptshield:latest   # replace with your registry + immutable tag/digest in prod
+          ports:
+            - containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          envFrom:
+            - configMapRef:
+                name: promptshield-config
+            - secretRef:
+                name: promptshield-secrets
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: promptshield
+spec:
+  selector:
+    app: promptshield
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: promptshield-pdb
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: promptshield
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promptshield-config
+data:
+  PROMPTSHIELD_RATE_CAPACITY: "20"
+  PROMPTSHIELD_RATE_REFILL: "0.5"
+  PROMPTSHIELD_LOG_LEVEL: "INFO"
+  PROMPTSHIELD_ENABLE_INJECTION_SCAN: "true"
+  PROMPTSHIELD_ENABLE_PII_REDACTION: "true"
+  PROMPTSHIELD_ENABLE_RATE_LIMIT: "true"
+# promptshield-secrets is intentionally NOT defined here — create it via
+# `kubectl create secret` or an external-secrets operator pointed at
+# Vault/AWS Secrets Manager. Never commit a Secret manifest with real
+# values into git, even base64-encoded (that's encoding, not encryption).

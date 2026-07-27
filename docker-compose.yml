@@ -1,0 +1,19 @@
+services:
+  promptshield:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - ENABLE_ML=true
+      - USE_GPU=false
+      - LLM_API_URL=http://llm:11434/api/generate
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8080/healthz\")' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
