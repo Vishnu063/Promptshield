@@ -1,3 +1,5 @@
+> **Review this project:** [Source map, walkthrough, and evidence limits](INTERVIEW.md).
+
 # PromptShield
 
 **An AI security gateway that sits in front of any LLM API call and enforces prompt-injection detection, PII redaction, and rate limiting — with the full DevSecOps pipeline around it.**
